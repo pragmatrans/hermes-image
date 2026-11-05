@@ -1,44 +1,48 @@
 # hermes-image
 
-Наше дзеркало робочої версії Hermes Agent у GHCR: базовий образ піниться digest-ом,
-тобто це той самий Hermes, який зараз працює. Якщо апстрім оновить `latest` і щось
-зламає — тягнемо свій тег і повертаємось до робочого стану.
+A pin of the Hermes Agent runtime we actually run, kept in our own registry so a bad upstream
+update cannot take the working version away from us.
 
-Зверху докладені `gh` та `jq` (те, що інакше треба ставити руками в контейнер після
-кожного переїзду). Конфігу в образі немає: `/opt/data` — volume, конфіг живе в
-git-зрізах (`hermes-config`, скрипт `scripts/zriz.sh`).
+`FROM nousresearch/hermes-agent@sha256:e6d81ae5…` (the exact multi-arch image currently deployed)
+plus `gh` and `jq`, which otherwise have to be installed by hand inside the container after every
+migration. Config is **not** in here: `/opt/data` is a volume and config lives in git snapshots
+([`hermes-config`](https://github.com/pragmatrans/hermes-config), script `scripts/zriz.sh`).
 
-## Що в образі
+## Contents
 
 | | |
 |---|---|
-| база | `nousresearch/hermes-agent:v0.22.7@sha256:e6d81ae5…` (arm64 + amd64) |
-| додано | `gh 2.102.0`, `jq 1.7.1` |
-| не входить | `.env`, `auth.json`, `config.yaml`, сесії — все це на volume |
+| base | `nousresearch/hermes-agent:v0.22.7@sha256:e6d81ae52ebf6a43efa529701405509f20054ba818f179ddd748bed4f8af584c` |
+| platforms | `linux/amd64`, `linux/arm64` |
+| added | `gh 2.102.0`, `jq 1.7.1` |
+| not included | `.env`, `auth.json`, `config.yaml`, sessions — all of that is volume state |
 
-## Забрати
+## Use
 
 ```bash
 docker pull ghcr.io/pragmatrans/hermes-image:v0.22.7
-docker tag ghcr.io/pragmatrans/hermes-image:v0.22.7 nousresearch/hermes-agent:local-v0.22.7
+docker tag  ghcr.io/pragmatrans/hermes-image:v0.22.7 nousresearch/hermes-agent:local-v0.22.7
 ```
 
-Підміна в `docker-compose.yml` — рядок `image:` на свій, далі `docker compose up -d`.
+Point `image:` in `docker-compose.yml` at `nousresearch/hermes-agent:local-v0.22.7`, then
+`docker compose up -d`. Tags published per build: `v<version>`, `v<version>-<YYYYMMDD>`, `latest`.
 
-## Нова версія
+## Mirroring a new version
 
-1. Оновити Hermes звичайним способом, перевірити, що все живе.
-2. Дізнатись digest нової версії:
+1. Upgrade Hermes the usual way and confirm it actually works.
+2. Read the digest of that tag:
+
    ```bash
    curl -s https://hub.docker.com/v2/repositories/nousresearch/hermes-agent/tags/v0.23.0 \
      | jq -r .digest
    ```
-3. Actions → build → Run workflow, у полі `base`:
+
+3. Actions → **build** → *Run workflow*, set `base` to
    `nousresearch/hermes-agent:v0.23.0@sha256:<digest>`.
-4. Отриманий тег `v0.23.0` — це і є новий «робочий зріз» образу.
+4. The resulting `v0.23.0` tag is the new known-good runtime slice.
 
-## Межі безкоштовного плану
+## Why public
 
-Репозиторій публічний і образ публічний — Actions-хвилини та сховище GHCR для
-публічних пакетів безкоштовні без ліміту. Приватні пакети мали б 500 МБ, а цей
-образ ~1 ГБ, тому публічність тут не косметика.
+Public repos get unlimited Actions minutes and public GHCR packages get free storage and
+transfer; private GHCR is capped at 500 MB while this image is ~1 GB. Nothing secret is inside —
+the inheriting `.env`, `auth.json` and config stay on the volume.

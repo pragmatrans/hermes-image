@@ -1,12 +1,12 @@
-# Дзеркало робочої версії Hermes у нашому власному GHCR + те, що ми ставили руками.
+# Mirror of the Hermes runtime we actually run, plus the tools we used to install by hand.
 #
-# Навіщо: базовий образ пінить digest, тобто це той самий біт-у-біт Hermes, який зараз
-# працює в нас. Якщо апстрім оновить latest і щось зламає — тягнемо свій тег v0.22.7
-# і повертаємось до робочого стану. Плюс gh і jq всередині, щоб не ставити їх у
-# контейнер після кожного переїзду.
+# Why: the base image is pinned by digest, so this is the exact Hermes currently
+# deployed. If upstream moves latest and breaks something, we pull our own v0.22.7
+# and get back to a working state. gh and jq are baked in so they stop needing a
+# hand install inside the container after every migration.
 #
-# Конфігу тут НЕМА і не буде: /opt/data — це volume, конфіг живе в git-зрізах
-# (scripts/zriz.sh), а не в шарах образу.
+# No config here on purpose: /opt/data is a volume and config lives in git snapshots
+# (scripts/zriz.sh), not in image layers.
 ARG BASE=nousresearch/hermes-agent:v0.22.7@sha256:e6d81ae52ebf6a43efa529701405509f20054ba818f179ddd748bed4f8af584c
 FROM ${BASE}
 
