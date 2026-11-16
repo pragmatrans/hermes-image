@@ -1,6 +1,8 @@
 name: build
 
-# Manual dispatch is the main path: build once an upgraded Hermes is verified.
+# Manual dispatch is the ONLY path: a push to main with empty inputs computes
+# tag = v<base> and silently overwrites the tag prod runs (and the rollback target).
+# Build with: gh workflow run build --ref <branch> -f tag=v<base>-<label>
 on:
   workflow_dispatch:
     inputs:
@@ -12,8 +14,6 @@ on:
         description: 'Tag for our image (empty = v<version from the base tag>)'
         required: false
         default: ''
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -86,5 +86,7 @@ jobs:
           done
           python3 -c 'import yaml; print("pyyaml", yaml.__version__)'
           git lfs version
+          test "$(sqlite3 :memory: 'select 42')" = "42"   # --version мовчить про ABI-mismatch
+          test "$(pdftotext -v 2>&1 | head -1 | cut -d' ' -f3)" != ""
           /opt/hermes/bin/hermes --version
           SH

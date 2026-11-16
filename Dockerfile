@@ -56,11 +56,28 @@ RUN set -eux; \
     fi; \
     /opt/hermes/.venv/bin/python -m pip install --no-cache-dir pyyaml
 
+# sqlite3 CLI needs a shim: Debian's binary is built against libsqlite3 3.46, but the base image
+# carries a newer libsqlite3 (3.53, built for Python) in /usr/local/lib, which the loader picks
+# first — the CLI then dies with "SQLite header and source version mismatch" and exits non-zero
+# WITHOUT running the query (so `sqlite3 --version` alone proves nothing). Pin the CLI to the
+# distro lib in a wrapper; the venv Python keeps its newer lib untouched.
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+        amd64) LIBDIR=/usr/lib/x86_64-linux-gnu ;; \
+        arm64) LIBDIR=/usr/lib/aarch64-linux-gnu ;; \
+        *) echo "unknown arch $(dpkg --print-architecture)"; exit 1 ;; \
+    esac; \
+    printf '#!/bin/sh\n# див. коментар у Dockerfile: системна libsqlite3, інакше CLI падає з mismatch\nexec env LD_LIBRARY_PATH=%s /usr/bin/sqlite3 "$@"\n' "$LIBDIR" > /usr/local/bin/sqlite3; \
+    chmod 0755 /usr/local/bin/sqlite3; \
+    sqlite3 :memory: 'select 42' | grep -qx 42
+
 # Self-check: a tool layer that silently misses a binary is worse than no layer,
 # because the next session finds out halfway through a task.
+# sqlite3 перевіряємо РЕАЛЬНИМ запитом: --version мовчить, коли ABI бібліотеки не той.
 RUN set -eux; \
     for b in pdftotext zbarimg qrencode git-lfs sqlite3 gh jq; do \
         command -v "$b" >/dev/null || { echo "MISSING: $b"; exit 1; }; \
     done; \
     python3 -c 'import yaml; print("pyyaml", yaml.__version__)'; \
+    sqlite3 :memory: 'select 42' | grep -qx 42; \
     git lfs version; pdftotext -v 2>&1 | head -1 || true
