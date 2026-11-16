@@ -25,15 +25,33 @@ missing), and the `smoke` job runs the pushed image to prove the tools and the H
 work. What goes in layers: code and tools. What never does: config, skills, plugins, cron, sessions
 (all of that is the `/opt/data` volume) and secrets.
 
+## Tags: що означає кожен
+
+| Тег | Що це | Для чого |
+|---|---|---|
+| `v0.22.7` | чиста база, без tool-шару | еталон «як у Nous», відкат |
+| `v0.22.7-tools2` | база + tools, робочий sqlite3 | **деплой** |
+| `v0.22.7-tools2-<YYYYMMDD>` | те саме з датою | пін на конкретну збірку |
+| `latest` | найновіший тулінг | оглянути, **не деплоїти** |
+
+**`v0.22.7-tools` — ЗЛАМАНИЙ, не використовувати.** У ньому CLI `sqlite3` падав з
+`SQLite header and source version mismatch` (Debian-бінарник зібраний під libsqlite3 3.46, а
+базовий образ несе 3.53 у `/usr/local/lib`), і `sqlite3 --version` цього **не показував**.
+Замінений на `-tools2`. Тег лишився в реєстрі лише історично — брати `-tools2`.
+
 ## Use
 
 ```bash
-docker pull ghcr.io/pragmatrans/hermes-image:v0.22.7
-docker tag  ghcr.io/pragmatrans/hermes-image:v0.22.7 nousresearch/hermes-agent:local-v0.22.7
+docker pull ghcr.io/pragmatrans/hermes-image:v0.22.7-tools2
 ```
 
-Point `image:` in `docker-compose.yml` at `nousresearch/hermes-agent:local-v0.22.7`, then
-`docker compose up -d`. Tags published per build: `v<version>`, `v<version>-<YYYYMMDD>`, `latest`.
+Point `image:` in `docker-compose.yml` **піненним** тегом (`…:v0.22.7-tools2`), then
+`docker compose up -d`. Деплой — завжди піненним тегом: `latest` рухається сам і одного дня
+принесе іншу базу.
+
+> Історично мак тягнув локальний аліас `nousresearch/hermes-agent:local-<версія>` (так було в
+> старому compose). 2026-11-16 мак перейшов на прямий тег реєстру; `local-v0.22.7` лишився
+> на диску як відкат.
 
 ## Mirroring a new version
 
@@ -45,9 +63,11 @@ Point `image:` in `docker-compose.yml` at `nousresearch/hermes-agent:local-v0.22
      | jq -r .digest
    ```
 
-3. Actions → **build** → *Run workflow*, set `base` to
-   `nousresearch/hermes-agent:v0.23.0@sha256:<digest>`.
-4. The resulting `v0.23.0` tag is the new known-good runtime slice.
+3. Actions → **build** → *Run workflow*: set `base` to
+   `nousresearch/hermes-agent:v0.23.0@sha256:<digest>` **і** `tag` явно (напр. `v0.23.0-tools`).
+   Пуш у `main` білд більше не запускає — з порожнім `tag` він обчислював `v<база>` і затирав
+   тег, на якому стоїть прод.
+4. The resulting pinned tag is the new known-good runtime slice (`latest` рухається сам).
 
 ## Why public
 
