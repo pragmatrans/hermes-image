@@ -14,8 +14,16 @@ migration. Config is **not** in here: `/opt/data` is a volume and config lives i
 |---|---|
 | base | `nousresearch/hermes-agent:v0.22.7@sha256:e6d81ae52ebf6a43efa529701405509f20054ba818f179ddd748bed4f8af584c` |
 | platforms | `linux/amd64`, `linux/arm64` |
-| added | `gh 2.102.0`, `jq 1.7.1` |
+| added | `gh 2.102.0`, `jq 1.7.1`, `pyyaml 6.0.3` (в venv), `pdftotext`, `zbarimg`, `qrencode`, `git-lfs`, `sqlite3` |
 | not included | `.env`, `auth.json`, `config.yaml`, sessions — all of that is volume state |
+
+## Why the tool layer is here
+
+Every one of these was installed by hand inside a running container at least once, usually in the
+middle of a task. The image installs them and then **checks itself** (build fails if a binary is
+missing), and the `smoke` job runs the pushed image to prove the tools and the Hermes entrypoint both
+work. What goes in layers: code and tools. What never does: config, skills, plugins, cron, sessions
+(all of that is the `/opt/data` volume) and secrets.
 
 ## Use
 
