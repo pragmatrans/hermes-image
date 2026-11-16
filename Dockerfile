@@ -1,5 +1,8 @@
 # Mirror of the Hermes runtime we actually run, plus the tools we kept installing by hand.
 #
+# Labels + /etc/hermes-tools.txt: щоб «що змінилось між двома тегами» було diff-ом, а не
+# археологією. base — пінений дайджест, решта — інвентар, знятий під час збірки.
+#
 # Why: the base image is pinned by digest, so this is the exact Hermes currently
 # deployed. If upstream moves latest and breaks something, we pull our own v0.22.7
 # and get back to a working state.
@@ -16,8 +19,10 @@ FROM ${BASE}
 
 USER root
 
+ARG BASE
 ARG GH_VERSION=2.102.0
 ARG JQ_VERSION=1.7.1
+ARG BUILD_TAG=dev
 
 # gh + jq: installed by hand after every migration before this image existed.
 RUN set -eux; \
@@ -81,3 +86,30 @@ RUN set -eux; \
     python3 -c 'import yaml; print("pyyaml", yaml.__version__)'; \
     sqlite3 :memory: 'select 42' | grep -qx 42; \
     git lfs version; pdftotext -v 2>&1 | head -1 || true
+
+# Inventory layer: what exactly is inside, in a form you can diff between two tags.
+LABEL org.opencontainers.image.title="hermes-image" \
+      org.opencontainers.image.description="Hermes Agent runtime (pinned base) plus ops tools" \
+      org.opencontainers.image.source="https://github.com/pragmatrans/hermes-image" \
+      org.opencontainers.image.version="${BUILD_TAG}" \
+      org.opencontainers.image.base.name="${BASE}" \
+      com.pragmatrans.hermes.base="${BASE}" \
+      com.pragmatrans.hermes.build-tag="${BUILD_TAG}"
+
+RUN set -eux; \
+    { \
+      echo "# base: ${BASE}"; \
+      echo "# build tag: ${BUILD_TAG}"; \
+      echo; \
+      echo "== dpkg (ops tools) =="; \
+      dpkg-query -W -f='${Package} ${Version}\n' \
+          poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml 2>/dev/null || true; \
+      echo; \
+      echo "== python venv =="; \
+      /opt/hermes/.venv/bin/python -m pip freeze 2>/dev/null | sort || true; \
+      echo; \
+      echo "== hermes =="; \
+      /opt/hermes/bin/hermes --version 2>/dev/null || true; \
+    } > /etc/hermes-tools.txt; \
+    test -s /etc/hermes-tools.txt; \
+    grep -q '== dpkg' /etc/hermes-tools.txt
