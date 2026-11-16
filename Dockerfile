@@ -32,25 +32,29 @@ RUN set -eux; \
     gh --version; jq --version
 
 # Tool layer: each of these was a manual install inside a live container at least once.
-#   pyyaml        — our scripts parse config.yaml; system python has no yaml module
-#                   (PEP 668: needs --break-system-packages). Hermes' own venv gets it
-#                   too, so `python3 -c 'import yaml'` works from any context.
+#   pyyaml        — our scripts parse config.yaml; neither the venv python nor the
+#                   distro one had a yaml module (we hit that twice in one week).
 #   poppler-utils — pdftotext for reading PDFs without a Python stack
 #   zbar-tools    — zbarimg: we verify QR codes we generate (WireGuard profile)
 #   qrencode      — generate QR codes (same WireGuard case)
 #   git-lfs       — Asuswrt-Merlin trees and vendor blobs use LFS
 #   sqlite3       — ad-hoc inspection of state.db without writing a Python one-liner
+# pyyaml: `python3` in this image IS /opt/hermes/.venv/bin/python3, and that venv ships
+# without pip (created by uv). So: system python3-yaml for the distro interpreter, then
+# bootstrap pip into the venv (get-pip) and install the cp314 wheel there — installing
+# into Debian's dist-packages would be invisible to the venv Python.
 RUN set -eux; \
     apt-get -o Acquire::Retries=3 update; \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-        poppler-utils zbar-tools qrencode git-lfs sqlite3; \
+        poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml; \
     rm -rf /var/lib/apt/lists/*; \
-    python3 -m pip install --no-cache-dir --break-system-packages pyyaml; \
-    if [ -x /opt/hermes/.venv/bin/python ] && /opt/hermes/.venv/bin/python -m pip --version >/dev/null 2>&1; then \
-        /opt/hermes/.venv/bin/python -m pip install --no-cache-dir pyyaml; \
-    else \
-        echo "WARN: /opt/hermes/.venv has no pip — pyyaml only in system python"; \
-    fi
+    /opt/hermes/.venv/bin/python -m ensurepip --default-pip >/dev/null 2>&1 || true; \
+    if ! /opt/hermes/.venv/bin/python -m pip --version >/dev/null 2>&1; then \
+        curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py; \
+        /opt/hermes/.venv/bin/python /tmp/get-pip.py --no-cache-dir; \
+        rm -f /tmp/get-pip.py; \
+    fi; \
+    /opt/hermes/.venv/bin/python -m pip install --no-cache-dir pyyaml
 
 # Self-check: a tool layer that silently misses a binary is worse than no layer,
 # because the next session finds out halfway through a task.
