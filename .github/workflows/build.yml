@@ -54,32 +54,42 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          build-args: ${{ steps.meta.outputs.args }}
+          build-args: |
+            ${{ steps.meta.outputs.args }}
+            BUILD_TAG=${{ steps.meta.outputs.tag }}
+          # `latest` свідомо НЕ пушимо: тег, що рухається сам, — це запрошення
+          # задеплоїти не те, що перевірили. Деплой тільки піненним тегом.
           tags: |
             ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.tag }}
             ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.tag }}-${{ steps.meta.outputs.date }}
-            ghcr.io/${{ github.repository }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Runtime smoke test on the pushed amd64 image: the tool layer is verified at build
-  # time, but only running the image proves we did not break the s6 entrypoint/CMD.
+  # Runtime smoke on BOTH architectures: the tool layer is verified at build time, but only
+  # running the image proves the entrypoint is alive. arm64 давно не перевірявся, а саме на ньому
+  # працює мак — тому тепер матриця, з QEMU для arm64.
   smoke:
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
     steps:
+      - uses: docker/setup-qemu-action@v3     # arm64 під QEMU: повільно, але ловить архітектурні тули
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Tools and runtime are alive
+      - name: Tools and runtime are alive (${{ matrix.platform }})
         run: |
           set -euo pipefail
           IMG="ghcr.io/${{ github.repository }}:${{ needs.build.outputs.tag }}"
-          docker pull --platform linux/amd64 "$IMG"
-          docker run --rm -i --platform linux/amd64 --entrypoint /bin/sh "$IMG" <<'SH'
+          PLAT="${{ matrix.platform }}"
+          docker pull --platform "$PLAT" "$IMG"
+          docker run --rm -i --platform "$PLAT" --entrypoint /bin/sh "$IMG" <<'SH'
           set -e
           for b in pdftotext zbarimg qrencode git-lfs sqlite3 gh jq python3; do
             command -v "$b" >/dev/null || { echo "MISSING: $b"; exit 1; }
@@ -88,5 +98,7 @@ jobs:
           git lfs version
           test "$(sqlite3 :memory: 'select 42')" = "42"   # --version мовчить про ABI-mismatch
           test "$(pdftotext -v 2>&1 | head -1 | cut -d' ' -f3)" != ""
+          python3 -c 'import sqlite3; print("python-sqlite", sqlite3.sqlite_version)'
+          test -s /etc/hermes-tools.txt && head -3 /etc/hermes-tools.txt
           /opt/hermes/bin/hermes --version
           SH

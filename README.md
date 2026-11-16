@@ -32,12 +32,25 @@ work. What goes in layers: code and tools. What never does: config, skills, plug
 | `v0.22.7` | чиста база, без tool-шару | еталон «як у Nous», відкат |
 | `v0.22.7-tools2` | база + tools, робочий sqlite3 | **деплой** |
 | `v0.22.7-tools2-<YYYYMMDD>` | те саме з датою | пін на конкретну збірку |
-| `latest` | найновіший тулінг | оглянути, **не деплоїти** |
+| ~~`latest`~~ | **більше не пушиться** | деплой тільки піненним тегом |
 
 **`v0.22.7-tools` — ЗЛАМАНИЙ, не використовувати.** У ньому CLI `sqlite3` падав з
 `SQLite header and source version mismatch` (Debian-бінарник зібраний під libsqlite3 3.46, а
 базовий образ несе 3.53 у `/usr/local/lib`), і `sqlite3 --version` цього **не показував**.
 Замінений на `-tools2`; **тег знято з реєстру 2026-11-16** (разом із датованим `-tools-20261116`).
+
+## Що всередині: інвентар і мітки
+
+При збірці створюється `/etc/hermes-tools.txt` — версії apt-тулів, `pip freeze` венва й
+`hermes --version`, плюс рядок `# base: <digest>`. ОСІ-мітки несуть те саме (`org.opencontainers.image.base.name`,
+`com.pragmatrans.hermes.build-tag`). Тому «що змінилось між тегами» — це `diff` двох файлів:
+
+```bash
+docker run --rm --entrypoint cat ghcr.io/pragmatrans/hermes-image:v0.22.7-tools3 /etc/hermes-tools.txt
+```
+
+Smoke-джоба ганяє образ на **обох** архітектурах (`linux/amd64` і `linux/arm64` під QEMU): раніше
+arm64 не перевірявся взагалі, а саме на ньому працює мак.
 
 ## Use
 
