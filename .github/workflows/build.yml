@@ -22,6 +22,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,3 +61,30 @@ jobs:
             ghcr.io/${{ github.repository }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Runtime smoke test on the pushed amd64 image: the tool layer is verified at build
+  # time, but only running the image proves we did not break the s6 entrypoint/CMD.
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tools and runtime are alive
+        run: |
+          set -euo pipefail
+          IMG="ghcr.io/${{ github.repository }}:${{ needs.build.outputs.tag }}"
+          docker pull --platform linux/amd64 "$IMG"
+          docker run --rm -i --platform linux/amd64 --entrypoint /bin/sh "$IMG" <<'SH'
+          set -e
+          for b in pdftotext zbarimg qrencode git-lfs sqlite3 gh jq python3; do
+            command -v "$b" >/dev/null || { echo "MISSING: $b"; exit 1; }
+          done
+          python3 -c 'import yaml; print("pyyaml", yaml.__version__)'
+          git lfs version
+          /opt/hermes/bin/hermes --version
+          SH
