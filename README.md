@@ -37,7 +37,7 @@ work. What goes in layers: code and tools. What never does: config, skills, plug
 **`v0.22.7-tools` — ЗЛАМАНИЙ, не використовувати.** У ньому CLI `sqlite3` падав з
 `SQLite header and source version mismatch` (Debian-бінарник зібраний під libsqlite3 3.46, а
 базовий образ несе 3.53 у `/usr/local/lib`), і `sqlite3 --version` цього **не показував**.
-Замінений на `-tools2`. Тег лишився в реєстрі лише історично — брати `-tools2`.
+Замінений на `-tools2`; **тег знято з реєстру 2026-11-16** (разом із датованим `-tools-20261116`).
 
 ## Use
 
