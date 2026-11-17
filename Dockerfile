@@ -87,6 +87,19 @@ RUN set -eux; \
     sqlite3 :memory: 'select 42' | grep -qx 42; \
     git lfs version; pdftotext -v 2>&1 | head -1 || true
 
+# Local source patch: retry the cron jobs.json parser (see patches/README.md).
+# Base image ships no `patch` binary, but git is there — `git apply` works outside a repo too.
+# Two-step so a context mismatch fails the BUILD, not the running container: a tag that silently
+# lacks the patch is worse than a red CI run.
+COPY patches/ /tmp/hermes-patches/
+RUN set -eux; \
+    cd /opt/hermes; \
+    git apply --check -p1 /tmp/hermes-patches/0001-cron-jobs-parse-retry.patch; \
+    git apply -p1 /tmp/hermes-patches/0001-cron-jobs-parse-retry.patch; \
+    python3 -c "import ast; ast.parse(open('/opt/hermes/cron/jobs.py').read())"; \
+    grep -q 'empty jobs.json (transient read)' /opt/hermes/cron/jobs.py; \
+    rm -rf /tmp/hermes-patches
+
 # Inventory layer: what exactly is inside, in a form you can diff between two tags.
 LABEL org.opencontainers.image.title="hermes-image" \
       org.opencontainers.image.description="Hermes Agent runtime (pinned base) plus ops tools" \
@@ -107,6 +120,9 @@ RUN set -eux; \
       echo; \
       echo "== python venv =="; \
       /opt/hermes/.venv/bin/python -m pip freeze 2>/dev/null | sort || true; \
+      echo; \
+      echo "== local patches =="; \
+      echo "0001-cron-jobs-parse-retry: applied to cron/jobs.py (transient-read retry)"; \
       echo; \
       echo "== hermes =="; \
       /opt/hermes/bin/hermes --version 2>/dev/null || true; \
