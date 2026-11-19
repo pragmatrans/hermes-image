@@ -14,7 +14,7 @@
 #
 # No config here on purpose: /opt/data is a volume and config lives in git snapshots
 # (scripts/zriz.sh), not in image layers.
-ARG BASE=nousresearch/hermes-agent:v0.22.7@sha256:e6d81ae52ebf6a43efa529701405509f20054ba818f179ddd748bed4f8af584c
+ARG BASE=nousresearch/hermes-agent:v0.23.2@sha256:d6746a084e9341baada483e3d6210444d3c1aeb7c130f0915150065fb2851459
 FROM ${BASE}
 
 USER root

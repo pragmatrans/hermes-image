@@ -1,35 +1,28 @@
---- a/cron/jobs.py	2026-11-17 19:17:13.356191003 +0000
-+++ b/cron/jobs.py	2026-11-17 19:17:13.356666086 +0000
-@@ -1366,12 +1366,29 @@
+diff --git a/cron/jobs.py b/cron/jobs.py
+index 04286a6..3536ad3 100644
+--- a/cron/jobs.py
++++ b/cron/jobs.py
+@@ -1369,9 +1369,20 @@ def get_ticker_last_error() -> Optional[str]:
+ def _parse_jobs_file(jobs_file: Path) -> tuple[Any, bool]:
      """Tolerant jobs.json parse -> ``(data, used_strict_fallback)``: utf-8-sig absorbs a BOM, strict
      failure retries with ``strict=False``. IO/fallback errors propagate (caller decides repair vs
-     bail)."""
+-    bail)."""
 -    with open(jobs_file, "r", encoding="utf-8-sig") as f:
 -        raw = f.read()
-+    # Retry a transient empty read before giving up. On filesystems where rename is not atomic
-+    # (virtiofs under Docker Desktop on macOS, any network FS) a reader can see a 0-byte
-+    # jobs.json for a few ms while a writer swaps its temp file in. Without the retry one bad
-+    # read escalates into a cron-wide outage: the auto-repair path reads the same file, fails
-+    # too, and then no writer runs (every write starts with a read) until the process restarts —
-+    # every tick logging ``Cron tick error`` in the meantime.
++    bail).
++
++    Local patch (hermes-image): a writer that truncated the file and has not finished yet makes
++    ``f.read()`` return an empty string; parsing that raises, and the caller reports corruption.
++    Only an empty read is retried (several short pauses) — "empty jobs.json (transient read)".
++    """
 +    raw = ""
-+    last_err: json.JSONDecodeError | None = None
-+    for attempt in range(4):
++    for pause in (0.0, 0.15, 0.30, 0.45):
++        if pause:
++            time.sleep(pause)
 +        with open(jobs_file, "r", encoding="utf-8-sig") as f:
 +            raw = f.read()
 +        if raw.strip():
-+            last_err = None
 +            break
-+        last_err = json.JSONDecodeError("empty jobs.json (transient read)", "", 0)
-+        time.sleep(0.15 * (attempt + 1))
      try:
          return json.loads(raw), False
      except json.JSONDecodeError:
--        return json.loads(raw, strict=False), True
-+        try:
-+            return json.loads(raw, strict=False), True
-+        except json.JSONDecodeError:
-+            raise last_err or json.JSONDecodeError("jobs.json unreadable", raw, 0)
- 
- 
- def load_jobs() -> list[dict[str, Any]]:
