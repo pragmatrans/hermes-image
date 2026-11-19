@@ -51,7 +51,8 @@ RUN set -eux; \
 RUN set -eux; \
     apt-get -o Acquire::Retries=3 update; \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-        poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml; \
+        poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml \
+        unzip p7zip-full netcat-openbsd rsync file patch; \
     rm -rf /var/lib/apt/lists/*; \
     /opt/hermes/.venv/bin/python -m ensurepip --default-pip >/dev/null 2>&1 || true; \
     if ! /opt/hermes/.venv/bin/python -m pip --version >/dev/null 2>&1; then \
@@ -80,12 +81,14 @@ RUN set -eux; \
 # because the next session finds out halfway through a task.
 # sqlite3 перевіряємо РЕАЛЬНИМ запитом: --version мовчить, коли ABI бібліотеки не той.
 RUN set -eux; \
-    for b in pdftotext zbarimg qrencode git-lfs sqlite3 gh jq; do \
+    for b in pdftotext zbarimg qrencode git-lfs sqlite3 gh jq \
+             unzip 7z nc rsync file patch; do \
         command -v "$b" >/dev/null || { echo "MISSING: $b"; exit 1; }; \
     done; \
     python3 -c 'import yaml; print("pyyaml", yaml.__version__)'; \
     sqlite3 :memory: 'select 42' | grep -qx 42; \
-    git lfs version; pdftotext -v 2>&1 | head -1 || true
+    git lfs version; pdftotext -v 2>&1 | head -1 || true; \
+    unzip -v | head -1; 7z | head -3 | tail -1; nc -h 2>&1 | head -1 || true
 
 # Local source patch: retry the cron jobs.json parser (see patches/README.md).
 # Base image ships no `patch` binary, but git is there — `git apply` works outside a repo too.
@@ -116,7 +119,8 @@ RUN set -eux; \
       echo; \
       echo "== dpkg (ops tools) =="; \
       dpkg-query -W -f='${Package} ${Version}\n' \
-          poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml 2>/dev/null || true; \
+          poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml unzip p7zip-full \
+          netcat-openbsd rsync file patch 2>/dev/null || true; \
       echo; \
       echo "== python venv =="; \
       /opt/hermes/.venv/bin/python -m pip freeze 2>/dev/null | sort || true; \
