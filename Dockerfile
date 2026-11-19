@@ -54,7 +54,7 @@ RUN set -eux; \
         poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml \
         unzip p7zip-full netcat-openbsd rsync file patch \
         iproute2 bind9-dnsutils whois traceroute mtr-tiny lsof socat zip zstd xz-utils \
-        binutils adb; \
+        binutils adb libopus0 libsodium23 aria2 wget; \
     rm -rf /var/lib/apt/lists/*; \
     /opt/hermes/.venv/bin/python -m ensurepip --default-pip >/dev/null 2>&1 || true; \
     if ! /opt/hermes/.venv/bin/python -m pip --version >/dev/null 2>&1; then \
@@ -85,13 +85,15 @@ RUN set -eux; \
 RUN set -eux; \
     for b in pdftotext zbarimg qrencode git-lfs sqlite3 gh jq \
              unzip 7z nc rsync file patch \
-             ip ss dig whois traceroute mtr lsof socat zip zstd xz strings adb; do \
+             ip ss dig whois traceroute mtr lsof socat zip zstd xz strings adb aria2c wget; do \
         command -v "$b" >/dev/null || { echo "MISSING: $b"; exit 1; }; \
     done; \
     python3 -c 'import yaml; print("pyyaml", yaml.__version__)'; \
     sqlite3 :memory: 'select 42' | grep -qx 42; \
     git lfs version; pdftotext -v 2>&1 | head -1 || true; \
-    unzip -v | head -1; 7z | head -3 | tail -1; nc -h 2>&1 | head -1 || true
+    unzip -v | head -1; 7z | head -3 | tail -1; nc -h 2>&1 | head -1 || true; \
+    python3 -c 'import ctypes; ctypes.CDLL("libopus.so.0"); ctypes.CDLL("libsodium.so.23"); print("opus+sodium ok")'; \
+    aria2c --version | head -1; wget --version | head -1
 
 # Local source patch: retry the cron jobs.json parser (see patches/README.md).
 # Base image ships no `patch` binary, but git is there — `git apply` works outside a repo too.
@@ -124,7 +126,8 @@ RUN set -eux; \
       dpkg-query -W -f='${Package} ${Version}\n' \
           poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml unzip p7zip-full \
           netcat-openbsd rsync file patch iproute2 bind9-dnsutils whois traceroute mtr-tiny \
-          lsof socat zip zstd xz-utils binutils adb 2>/dev/null || true; \
+          lsof socat zip zstd xz-utils binutils adb libopus0 libsodium23 aria2 wget \
+          2>/dev/null || true; \
       echo; \
       echo "== python venv =="; \
       /opt/hermes/.venv/bin/python -m pip freeze 2>/dev/null | sort || true; \
