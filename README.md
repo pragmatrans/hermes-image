@@ -30,7 +30,8 @@ work. What goes in layers: code and tools. What never does: config, skills, plug
 | Тег | Що це | Для чого |
 |---|---|---|
 | `v0.22.7` | чиста база, без tool-шару | еталон «як у Nous», відкат |
-| `v0.22.7-tools5` | tools4 + мережева діагностика (`ip`, `ss`, `dig`, `whois`, `traceroute`, `mtr`, `lsof`, `socat`), архіви (`zip`, `zstd`, `xz`), `strings`, `adb` | **ціль деплою** (4.79 ГБ, патч cron живий) |
+| `v0.22.7-tools6` | tools5 + `libopus0`/`libsodium23` (голос у Discord), `aria2`, `wget` | **ціль деплою** (4.81 ГБ, патч cron живий) |
+| `v0.22.7-tools5` | мережева діагностика (`ip`, `ss`, `dig`, `whois`, `traceroute`, `mtr`, `lsof`, `socat`), архіви (`zip`, `zstd`, `xz`), `strings`, `adb` | зараз на VPS; відкат після tools6 |
 | `v0.22.7-tools4` | unzip/p7zip/nc/rsync/file/patch + self-check | проміжний, не деплоїти (перекритий tools5) |
 | `v0.22.7-tools3` | те саме + локальний патч `cron/jobs.py` (ретрай порожнього читання) | **зараз на маку**; відкат після tools5 |
 | `v0.22.7-tools2` | база + tools, робочий sqlite3 | прибрати після підтвердження tools5 |
