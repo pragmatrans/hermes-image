@@ -95,11 +95,11 @@ RUN set -eux; \
     python3 -c 'import ctypes; ctypes.CDLL("libopus.so.0"); ctypes.CDLL("libsodium.so.23"); print("opus+sodium ok")'; \
     aria2c --version | head -1; wget --version | head -1
 
-# pnpm: у 0.23 `hermes pm` вважає його обовʼязковим для збирання JS-артефактів (Web UI, плагіни).
-# Без нього кожна команда друкує «install out of sync (pnpm: not installed or outdated)».
-RUN set -eux; \
-    npm install -g pnpm@10 >/dev/null; \
-    pnpm --version
+# pnpm НЕ вшиваємо в образ: у 0.23 його ставить сам Hermes — `hermes pm install pnpm`
+# (25 МБ, лягає в /opt/data/tools/pnpm-<версія>-<платформа>, тобто у volume даних).
+# `npm install -g` не працює: глобальний prefix — /opt/hermes/tools/node-…, його немає в PATH,
+# і `hermes pm doctor` все одно показує «not installed» (pm веде власний реєстр).
+# Тому: один раз на хост після деплою → `hermes pm install pnpm`.
 
 # Патч cron/jobs.py БІЛЬШЕ НЕ ПОТРІБЕН (перевірено 20.11 на 0.23.2).
 # У 0.23 запис jobs.json атомарний: mkstemp_beside → fsync → os.replace, тому читач не бачить
