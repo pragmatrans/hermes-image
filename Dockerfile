@@ -95,18 +95,17 @@ RUN set -eux; \
     python3 -c 'import ctypes; ctypes.CDLL("libopus.so.0"); ctypes.CDLL("libsodium.so.23"); print("opus+sodium ok")'; \
     aria2c --version | head -1; wget --version | head -1
 
-# Local source patch: retry the cron jobs.json parser (see patches/README.md).
-# Base image ships no `patch` binary, but git is there — `git apply` works outside a repo too.
-# Two-step so a context mismatch fails the BUILD, not the running container: a tag that silently
-# lacks the patch is worse than a red CI run.
-COPY patches/ /tmp/hermes-patches/
+# pnpm: у 0.23 `hermes pm` вважає його обовʼязковим для збирання JS-артефактів (Web UI, плагіни).
+# Без нього кожна команда друкує «install out of sync (pnpm: not installed or outdated)».
 RUN set -eux; \
-    cd /opt/hermes; \
-    git apply --check -p1 /tmp/hermes-patches/0001-cron-jobs-parse-retry.patch; \
-    git apply -p1 /tmp/hermes-patches/0001-cron-jobs-parse-retry.patch; \
-    python3 -c "import ast; ast.parse(open('/opt/hermes/cron/jobs.py').read())"; \
-    grep -q 'empty jobs.json (transient read)' /opt/hermes/cron/jobs.py; \
-    rm -rf /tmp/hermes-patches
+    npm install -g pnpm@10 >/dev/null; \
+    pnpm --version
+
+# Патч cron/jobs.py БІЛЬШЕ НЕ ПОТРІБЕН (перевірено 20.11 на 0.23.2).
+# У 0.23 запис jobs.json атомарний: mkstemp_beside → fsync → os.replace, тому читач не бачить
+# порожнього файла. Наш retry захищав від гонки, яку давав virtiofs (cron тепер на ext4-томі).
+# Замість патчу — нагляд: cron-audit (кожні 30 хв) повідомляє, якщо jobs.json не читається.
+# Старий патч лежить у patches/attic/ — на випадок повернення на 0.22.x.
 
 # Inventory layer: what exactly is inside, in a form you can diff between two tags.
 LABEL org.opencontainers.image.title="hermes-image" \
