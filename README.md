@@ -90,3 +90,16 @@ Point `image:` in `docker-compose.yml` **піненним** тегом (`…:v0.
 Public repos get unlimited Actions minutes and public GHCR packages get free storage and
 transfer; private GHCR is capped at 500 MB while this image is ~1 GB. Nothing secret is inside —
 the inheriting `.env`, `auth.json` and config stay on the volume.
+
+## Tag retention
+
+Old tags stay for **2–3 days after a switch** — they are both the rollback and the "resume from
+here" point while the new layer is being tested. Only then prune, keeping the current tag and the
+one before it:
+
+```
+docker image prune -a --filter "until=72h"     # or remove specific tags by hand
+```
+
+Rule of thumb: ~5 GB per tag per host, so three live tags is the ceiling before it starts to matter
+on a 96 GB partition shared with everything else.
