@@ -106,6 +106,7 @@ def resolve(pkt):
         if hit and hit[0] > now:
             resp = bytearray(hit[1])
             resp[0:2] = pkt[0:2]        # той самий transaction id
+            state(True, "cache")
             return bytes(resp), "cache"
     order = list(range(len(PROVIDERS)))
     start = _primary[0]
@@ -205,7 +206,6 @@ def main():
     verbose = "--verbose" in sys.argv
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
-    claim_resolv()
     u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     u.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     u.bind(("127.0.0.1", port))
@@ -213,6 +213,9 @@ def main():
     t.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     t.bind(("127.0.0.1", port))
     t.listen(32)
+    # resolv.conf забираємо ЛИШЕ після того, як порт уже слухає: інакше між двома діями є вікно,
+    # у якому система резолвить у нікуди (саме так ловили «Could not resolve host» на рестарті).
+    claim_resolv()
     log(f"старт на 127.0.0.1:{port}, провайдери: {[p[0] for p in PROVIDERS]}")
     threading.Thread(target=serve_tcp, args=(t, verbose), daemon=True).start()
     serve_udp(u, verbose)

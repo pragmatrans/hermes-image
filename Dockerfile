@@ -52,7 +52,7 @@ RUN set -eux; \
     apt-get -o Acquire::Retries=3 update; \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
         poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml \
-        unzip p7zip-full netcat-openbsd rsync file patch \
+        unzip 7zip netcat-openbsd rsync file patch less strace \
         iproute2 bind9-dnsutils whois traceroute mtr-tiny lsof socat zip zstd xz-utils \
         binutils adb libopus0 libsodium23 aria2 wget; \
     rm -rf /var/lib/apt/lists/*; \
@@ -107,6 +107,12 @@ RUN set -eux; \
 # Замість патчу — нагляд: cron-audit (кожні 30 хв) повідомляє, якщо jobs.json не читається.
 # Старий патч лежить у patches/attic/ — на випадок повернення на 0.22.x.
 
+# uv-cache — 459 МБ мертвої ваги з базового образу: бінарника `uv` у PATH немає, отже цей кеш
+# ніколи не використовується. Знайдено братом під час огляду tools9 зсередини.
+RUN set -eux; \
+    rm -rf /opt/hermes/uv-cache; \
+    test ! -e /opt/hermes/uv-cache
+
 # DoH-стаб: локальний DNS (127.0.0.1:53), що ходить до провайдерів по HTTPS.
 # Навіщо: звичайні DNS-запити провайдер бачить відкритим текстом. ControlD лишається на маці
 # для браузера; контейнер має власний шифрований шлях і не залежить від резолвера хоста.
@@ -137,8 +143,8 @@ RUN set -eux; \
       echo; \
       echo "== dpkg (ops tools) =="; \
       dpkg-query -W -f='${Package} ${Version}\n' \
-          poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml unzip p7zip-full \
-          netcat-openbsd rsync file patch iproute2 bind9-dnsutils whois traceroute mtr-tiny \
+          poppler-utils zbar-tools qrencode git-lfs sqlite3 python3-yaml unzip 7zip \
+          netcat-openbsd rsync file patch less strace iproute2 bind9-dnsutils whois traceroute mtr-tiny \
           lsof socat zip zstd xz-utils binutils adb libopus0 libsodium23 aria2 wget \
           2>/dev/null || true; \
       echo; \
