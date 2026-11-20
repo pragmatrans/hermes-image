@@ -171,11 +171,41 @@ def serve_tcp(srv, verbose):
                 pass
 
 
+RESOLV = Path("/etc/resolv.conf")
+RESOLV_BAK = Path("/etc/resolv.conf.docker.bak")
+
+
+def claim_resolv():
+    """Переводимо систему на себе: nameserver 127.0.0.1.
+
+    Docker генерує resolv.conf один раз і далі не перезаписує — тому образ може «забрати» DNS
+    собі без правок compose на кожному хості. Оригінал зберігаємо поруч, щоб було куди відкотити.
+    """
+    try:
+        cur = RESOLV.read_text() if RESOLV.exists() else ""
+    except Exception:
+        return
+    if "nameserver 127.0.0.1" in cur and "doh-stub" in cur:
+        return
+    try:
+        if not RESOLV_BAK.exists() and cur:
+            RESOLV_BAK.write_text(cur)
+        RESOLV.write_text(
+            "# Керується doh-stub (Hermes): DNS іде по HTTPS, а не відкритим текстом.\n"
+            "# Оригінал Docker: /etc/resolv.conf.docker.bak\n"
+            "nameserver 127.0.0.1\noptions ndots:0\n"
+        )
+        log("resolv.conf → nameserver 127.0.0.1")
+    except Exception as e:
+        log(f"не зміг переписати resolv.conf: {type(e).__name__}: {e}")
+
+
 def main():
     port = 53
     verbose = "--verbose" in sys.argv
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
+    claim_resolv()
     u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     u.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     u.bind(("127.0.0.1", port))
