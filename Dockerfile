@@ -95,6 +95,19 @@ RUN set -eux; \
     python3 -c 'import ctypes; ctypes.CDLL("libopus.so.0"); ctypes.CDLL("libsodium.so.23"); print("opus+sodium ok")'; \
     aria2c --version | head -1; wget --version | head -1
 
+# uv є в образі (`/opt/hermes/tools/uv-<ver>-linux-<arch>/uv`, ~32 МБ), але не в PATH —
+# тобто «є, але недоступний». Симлінк коштує 0 байт і прибирає цей клас питань.
+RUN set -eux; \
+    uv_bin="$(ls -d /opt/hermes/tools/uv-*-linux-*/uv 2>/dev/null | head -1)"; \
+    test -n "$uv_bin"; \
+    ln -sf "$uv_bin" /usr/local/bin/uv; \
+    uv --version
+
+# qrencode та інші GTK-залежні інструменти пишуть у stderr
+# «Failed to connect to socket /run/dbus/system_bus_socket» — косметика, але в скриптах це шум,
+# який маскує справжні помилки.
+ENV DBUS_SESSION_BUS_ADDRESS=disabled:
+
 # pnpm НЕ вшиваємо в образ: у 0.23 його ставить сам Hermes — `hermes pm install pnpm`
 # (25 МБ, лягає в /opt/data/tools/pnpm-<версія>-<платформа>, тобто у volume даних).
 # `npm install -g` не працює: глобальний prefix — /opt/hermes/tools/node-…, його немає в PATH,
