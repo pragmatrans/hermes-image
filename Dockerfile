@@ -107,6 +107,20 @@ RUN set -eux; \
 # Замість патчу — нагляд: cron-audit (кожні 30 хв) повідомляє, якщо jobs.json не читається.
 # Старий патч лежить у patches/attic/ — на випадок повернення на 0.22.x.
 
+# DoH-стаб: локальний DNS (127.0.0.1:53), що ходить до провайдерів по HTTPS.
+# Навіщо: звичайні DNS-запити провайдер бачить відкритим текстом. ControlD лишається на маці
+# для браузера; контейнер має власний шифрований шлях і не залежить від резолвера хоста.
+# Сервіс s6 — щоб стаб жив до hermes і піднімався сам після падінь (compose dns: 127.0.0.1).
+COPY dns/doh_stub.py /opt/hermes-dns/doh_stub.py
+RUN set -eux; \
+    chmod 755 /opt/hermes-dns/doh_stub.py; \
+    mkdir -p /etc/s6-overlay/s6-rc.d/doh-stub/dependencies.d; \
+    printf 'longrun\n' > /etc/s6-overlay/s6-rc.d/doh-stub/type; \
+    printf '#!/command/with-contenv sh\nexec python3 /opt/hermes-dns/doh_stub.py\n' > /etc/s6-overlay/s6-rc.d/doh-stub/run; \
+    chmod 755 /etc/s6-overlay/s6-rc.d/doh-stub/run; \
+    : > /etc/s6-overlay/s6-rc.d/user/contents.d/doh-stub; \
+    python3 -c 'import ast; ast.parse(open("/opt/hermes-dns/doh_stub.py").read()); print("doh_stub: ast ok")'
+
 # Inventory layer: what exactly is inside, in a form you can diff between two tags.
 LABEL org.opencontainers.image.title="hermes-image" \
       org.opencontainers.image.description="Hermes Agent runtime (pinned base) plus ops tools" \
@@ -132,7 +146,6 @@ RUN set -eux; \
       /opt/hermes/.venv/bin/python -m pip freeze 2>/dev/null | sort || true; \
       echo; \
       echo "== local patches =="; \
-      echo "0001-cron-jobs-parse-retry: applied to cron/jobs.py (transient-read retry)"; \
       echo; \
       echo "== hermes =="; \
       /opt/hermes/bin/hermes --version 2>/dev/null || true; \
